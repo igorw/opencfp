@@ -1,15 +1,17 @@
 <?php
-namespace OpenCFP;
+namespace OpenCFP\Controller;
 
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
+use OpenCFP\Form\TalkForm;
+use OpenCFP\Model\Talk;
 
 class TalkController
 {
     public function editAction(Request $req, Application $app)
     {
         if (!$app['sentry']->check()) {
-            return $app->redirect('/login');
+            return $app->redirect($app['url'] . '/login');
         }
 
         $id = $req->get('id');
@@ -17,14 +19,14 @@ class TalkController
         $talk_id= filter_var($id, FILTER_VALIDATE_INT);
 
         if (empty($talk_id)) {
-            return $app->redirect('/dashboard');
+            return $app->redirect($app['url'] . '/dashboard');
         }
-            
-        $talk = new \OpenCFP\Talk($app['db']);
+
+        $talk = new Talk($app['db']);
         $talk_info = $talk->findById($talk_id);
 
         if ($talk_info['user_id'] !== $user->getId()) {
-            return $app->redirect('/dashboard');
+            return $app->redirect($app['url'] . '/dashboard');
         }
 
         $template_name = 'edit_talk.twig';
@@ -45,11 +47,11 @@ class TalkController
     public function createAction(Request $req, Application $app)
     {
         if (!$app['sentry']->check()) {
-            return $app->redirect('/login');
+            return $app->redirect($app['url'] . '/login');
         }
-        
+
         $user = $app['sentry']->getUser();
-        
+
         $template_name = 'create_talk.twig';
         $template = $app['twig']->loadTemplate($template_name);
         $data = array(
@@ -67,7 +69,7 @@ class TalkController
     public function processCreateAction(Request $req, Application $app)
     {
         if (!$app['sentry']->check()) {
-            return $app->redirect('/login');
+            return $app->redirect($app['url'] . '/login');
         }
 
         $user = $app['sentry']->getUser();
@@ -78,7 +80,7 @@ class TalkController
             'user_id' => $req->get('user_id')
         );
 
-        $form = new \OpenCFP\TalkForm($request_data, $app['purifier']);
+        $form = new TalkForm($request_data, $app['purifier']);
         $form->sanitize();
 
         if (!$form->validateAll()) {
@@ -92,10 +94,10 @@ class TalkController
                 'user' => $user,
                 'error_message' => implode('<br>', $form->error_messages)
             );
-            
+
             return $template->render($data);
         }
-        
+
         $sanitized_data = $form->getSanitizedData();
         $data = array(
             'title' => $sanitized_data['title'],
@@ -104,8 +106,8 @@ class TalkController
             'user_id' => (int)$user->getId(),
             'user' => $user
         );
-        $talk = new \OpenCFP\Talk($app['db']);
-        
+        $talk = new Talk($app['db']);
+
         if (!$talk->create($data)) {
             $template_name = 'create_talk.twig';
             $template = $app['twig']->loadTemplate('create_talk.twig');
@@ -115,20 +117,20 @@ class TalkController
 
             return $template->render($data);
         }
-        
+
         $app['session']->set('flash', array(
             'type' => 'success',
             'short' => '',
             'ext' => "Succesfully created a talk"
         ));
 
-        return $app->redirect('/dashboard');
+        return $app->redirect($app['url'] . '/dashboard');
     }
 
     public function updateAction(Request $req, Application $app)
     {
         if (!$app['sentry']->check()) {
-            return $app->redirect('/login');
+            return $app->redirect($app['url'] . '/login');
         }
 
         $user = $app['sentry']->getUser();
@@ -141,7 +143,7 @@ class TalkController
             'user_id' => $req->get('user_id')
         );
 
-        $form = new \OpenCFP\TalkForm($request_data, $app['purifier']);
+        $form = new TalkForm($request_data, $app['purifier']);
         $form->sanitize();
         $valid = $form->validateAll();
 
@@ -154,14 +156,14 @@ class TalkController
                 'type' => $sanitized_data['type'],
                 'user_id' => (int)$user->getId()
             );
-            $talk = new \OpenCFP\Talk($app['db']);
+            $talk = new Talk($app['db']);
             $talk->update($data);
             $app['session']->set('flash', array(
                 'type' => 'success',
                 'short' => 'Updated talk!'
             ));
-            
-            return $app->redirect('/dashboard');
+
+            return $app->redirect($app['url'] . '/dashboard');
         }
 
         if (!$valid) {
@@ -180,8 +182,8 @@ class TalkController
 
             return $template->render($data);
         }
-        
-        return $app->redirect('/talk/edit/' . $req->get('id'));
+
+        return $app->redirect($app['url'] . '/talk/edit/' . $req->get('id'));
     }
 
     public function deleteAction(Request $req, Application $app)
@@ -191,12 +193,12 @@ class TalkController
         }
 
         $user = $app['sentry']->getUser();
-        $talk = new \OpenCFP\Talk($app['db']);
-        
+        $talk = new Talk($app['db']);
+
         if ($talk->delete($req->get('tid'), $req->get('user_id')) === true) {
             return $app->json(array('delete' => 'ok'));
         }
 
         return $app->json(array('delete' => 'no'));
-    } 
+    }
 }

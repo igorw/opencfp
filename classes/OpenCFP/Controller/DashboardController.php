@@ -1,19 +1,20 @@
 <?php
-namespace OpenCFP;
+namespace OpenCFP\Controller;
 
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
+use OpenCFP\Model\Talk;
 
 class DashboardController
 {
     public function indexAction(Request $req, Application $app)
     {
         if (!$app['sentry']->check()) {
-            return $app->redirect('/login');
+            return $app->redirect($app['url'] . '/login');
         }
 
         $user = $app['sentry']->getUser();
-        $talk = new \OpenCFP\Talk($app['db']);
+        $talk = new Talk($app['db']);
         $my_talks = $talk->findByUserId($user->getId());
 
         // Load our template and RENDER

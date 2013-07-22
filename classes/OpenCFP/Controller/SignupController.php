@@ -1,9 +1,11 @@
 <?php
-namespace OpenCFP;
+namespace OpenCFP\Controller;
 
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
 use Cartalyst\Sentry\Users\UserExistsException;
+use OpenCFP\Form\SignupForm;
+use OpenCFP\Model\Speaker;
 
 class SignupController
 {
@@ -42,7 +44,7 @@ class SignupController
         $form_data['speaker_info'] = $req->get('speaker_info') ?: null;
         $form_data['speaker_bio'] = $req->get('speaker_bio') ?: null;
 
-        $form = new \OpenCFP\SignupForm($form_data, $app['purifier']);
+        $form = new SignupForm($form_data, $app['purifier']);
         $form->sanitize();
 
         if ($form->validateAll()) {
@@ -65,14 +67,14 @@ class SignupController
                 $user->addGroup($adminGroup);
 
                 // Create a Speaker record
-                $speaker = new \OpenCFP\Speaker($app['db']);
+                $speaker = new Speaker($app['db']);
                 $response = $speaker->create(array(
                     'user_id' => $user->getId(),
                     'info' => $sanitized_data['speaker_info'],
                     'bio' => $sanitized_data['speaker_bio']
                 ));
 
-                return $app->redirect('/signup/success');
+                return $app->redirect($app['url'] . '/signup/success');
             } catch (UserExistsException $e) {
                 $form_data['error_message'] = 'A user already exists with that email address';
             }

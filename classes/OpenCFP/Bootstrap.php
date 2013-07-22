@@ -3,6 +3,7 @@ namespace OpenCFP;
 
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use OpenCFP\Config\ConfigINIFileLoader;
 use Pimple;
 use Twig_Environment;
 use Twig_Loader_Filesystem;
@@ -31,15 +32,37 @@ class Bootstrap
         $app = new \Silex\Application();
 
         $app['debug'] = true;
+
+
         // Register our session provider
         $app->register(new \Silex\Provider\SessionServiceProvider());
         $app->before(function ($request) use ($app) {
             $app['session']->start();
         });
+		$app['url'] = $this->getConfig('application.url');
 
-        // Register the Twig provider
-        $app->register(new \Silex\Provider\TwigServiceProvider());
-        $app['twig'] = $this->getTwig();
+        // Register the Twig provider and lazy-load the global values
+        $app->register(
+            new \Silex\Provider\TwigServiceProvider(),
+            array('twig.path' => APP_DIR . $this->getConfig('twig.template_dir'))
+        );
+        $that = $this;
+        $app['twig'] = $app->share($app->extend('twig', function ($twig, $app) use ($that) {
+            $twig->addGlobal('site', array(
+                'url' => $that->getConfig('application.url'),
+                'title' => $that->getConfig('application.title')
+            ));
+
+            return $twig;
+        }));
+
+        // Register our use of the Form Service Provider
+        $app->register(new \Silex\Provider\FormServiceProvider());
+        $app->register(new \Silex\Provider\ValidatorServiceProvider());
+        $app->register(new \Silex\Provider\TranslationServiceProvider(), array(
+            'translator.messages' => array()
+        ));
+
 
         $app['db'] = $this->getDb();
 
@@ -63,7 +86,7 @@ class Bootstrap
             );
 
             \Cartalyst\Sentry\Facades\Native\Sentry::setupDatabaseResolver($app['db']);
-
+            $throttleProvider->disable();
             return $sentry;
         });
 
@@ -78,6 +101,7 @@ class Bootstrap
         });
 
         $app = $this->defineRoutes($app);
+
 
         return $app;
     }
@@ -94,22 +118,27 @@ class Bootstrap
             return $template->render($view);
         });
 
-        $app->get('/dashboard', 'OpenCFP\DashboardController::indexAction');
-        $app->get('/talk/edit/{id}', 'OpenCFP\TalkController::editAction');
-        $app->get('/talk/create', 'OpenCFP\TalkController::createAction');
-        $app->post('/talk/create', 'OpenCFP\TalkController::processCreateAction');
-        $app->post('/talk/update', 'OpenCFP\TalkController::updateAction');
-        $app->post('/talk/delete', 'OpenCFP\TalkController::deleteAction');
-        $app->get('/login', 'OpenCFP\LoginController::indexAction');
-        $app->post('/login', 'OpenCFP\LoginController::processAction');
-        $app->get('/logout', 'OpenCFP\LoginController::outAction');
-        $app->get('/signup', 'OpenCFP\SignupController::indexAction');
-        $app->post('/signup', 'OpenCFP\SignupController::processAction');
-        $app->get('/signup/success', 'OpenCFP\SignupController::successAction');
-        $app->get('/profile/edit/{id}', 'OpenCFP\ProfileController::editAction');
-        $app->post('/profile/edit', 'OpenCFP\ProfileController::processAction');
-        $app->get('/profile/change_password', 'OpenCFP\ProfileController::passwordAction');
-        $app->post('/profile/change_password', 'OpenCFP\ProfileController::passwordProcessAction');
+        $app->get('/dashboard', 'OpenCFP\Controller\DashboardController::indexAction');
+        $app->get('/talk/edit/{id}', 'OpenCFP\Controller\TalkController::editAction');
+        $app->get('/talk/create', 'OpenCFP\Controller\TalkController::createAction');
+        $app->post('/talk/create', 'OpenCFP\Controller\TalkController::processCreateAction');
+        $app->post('/talk/update', 'OpenCFP\Controller\TalkController::updateAction');
+        $app->post('/talk/delete', 'OpenCFP\Controller\TalkController::deleteAction');
+        $app->get('/login', 'OpenCFP\Controller\SecurityController::indexAction');
+        $app->post('/login', 'OpenCFP\Controller\SecurityController::processAction');
+        $app->get('/logout', 'OpenCFP\Controller\SecurityController::outAction');
+        $app->get('/signup', 'OpenCFP\Controller\SignupController::indexAction');
+        $app->post('/signup', 'OpenCFP\Controller\SignupController::processAction');
+        $app->get('/signup/success', 'OpenCFP\Controller\SignupController::successAction');
+        $app->get('/profile/edit/{id}', 'OpenCFP\Controller\ProfileController::editAction');
+        $app->post('/profile/edit', 'OpenCFP\Controller\ProfileController::processAction');
+        $app->get('/profile/change_password', 'OpenCFP\Controller\ProfileController::passwordAction');
+        $app->post('/profile/change_password', 'OpenCFP\Controller\ProfileController::passwordProcessAction');
+        $app->get('/forgot', 'OpenCFP\Controller\ForgotController::indexAction');
+        $app->post('/forgot', 'OpenCFP\Controller\ForgotController::sendResetAction');
+        $app->get('/forgot_success', 'OpenCFP\Controller\ForgotController::successAction');
+        $app->get('/reset/{user_id}/{reset_code}', 'OpenCFP\Controller\ForgotController::resetAction');
+        $app->post('/reset', 'OpenCFP\Controller\ForgotController::processResetAction');
 
         return $app;
     }
